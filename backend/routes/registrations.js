@@ -11,9 +11,9 @@ router.post('/', auth, checkRole(['student']), async (req, res) => {
     await connection.beginTransaction();
 
     const { event_id } = req.body;
-    const student_id = req.user.id;
+    const user_id = req.user.id;
 
-    console.log('Registration attempt:', { event_id, student_id });
+    console.log('Registration attempt:', { event_id, user_id });
 
     // Validate event_id
     if (!event_id || isNaN(parseInt(event_id))) {
@@ -56,8 +56,8 @@ router.post('/', auth, checkRole(['student']), async (req, res) => {
     // Check if already registered
     const [existingReg] = await connection.query(
       `SELECT * FROM registrations 
-       WHERE event_id = ? AND student_id = ?`,
-      [event_id, student_id]
+       WHERE event_id = ? AND user_id = ?`,
+      [event_id, user_id]
     );
 
     if (existingReg.length > 0) {
@@ -66,9 +66,9 @@ router.post('/', auth, checkRole(['student']), async (req, res) => {
 
     // Register student
     const [result] = await connection.query(
-      `INSERT INTO registrations (event_id, student_id, status) 
+      `INSERT INTO registrations (event_id, user_id, status) 
        VALUES (?, ?, "confirmed")`,
-      [event_id, student_id]
+      [event_id, user_id]
     );
 
     console.log('Registration created:', result);
@@ -128,7 +128,7 @@ router.get('/event/:event_id', auth, checkRole(['organizer', 'admin']), async (r
     const [registrations] = await db.query(`
       SELECT r.*, u.name as student_name, u.email as student_email
       FROM registrations r
-      JOIN users u ON r.student_id = u.id
+      JOIN users u ON r.user_id = u.id
       WHERE r.event_id = ?
     `, [event_id]);
 
@@ -147,7 +147,7 @@ router.get('/student', auth, checkRole(['student']), async (req, res) => {
       FROM registrations r
       JOIN events e ON r.event_id = e.id
       JOIN users u ON e.organizer_id = u.id
-      WHERE r.student_id = ?
+      WHERE r.user_id = ?
     `, [req.user.id]);
 
     res.json(registrations);
@@ -160,11 +160,11 @@ router.get('/student', auth, checkRole(['student']), async (req, res) => {
 router.delete('/:event_id', auth, checkRole(['student']), async (req, res) => {
   try {
     const event_id = req.params.event_id;
-    const student_id = req.user.id;
+    const user_id = req.user.id;
 
     const [result] = await db.query(
-      'DELETE FROM registrations WHERE event_id = ? AND student_id = ?',
-      [event_id, student_id]
+      'DELETE FROM registrations WHERE event_id = ? AND user_id = ?',
+      [event_id, user_id]
     );
 
     if (result.affectedRows === 0) {
@@ -202,7 +202,7 @@ router.get('/check/:eventId', auth, async (req, res) => {
     // Check registration status
     const [registrations] = await db.query(
       `SELECT * FROM registrations 
-       WHERE student_id = ? AND event_id = ?`,
+       WHERE user_id = ? AND event_id = ?`,
       [studentId, eventId]
     );
 

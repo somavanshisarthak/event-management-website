@@ -45,6 +45,7 @@ const initializeDatabase = async () => {
         capacity INT NOT NULL,
         category VARCHAR(100),
         organizer_id INT,
+        current_registrations INT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (organizer_id) REFERENCES users(id)
