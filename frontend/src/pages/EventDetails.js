@@ -26,22 +26,44 @@ const EventDetails = () => {
   useEffect(() => {
     const fetchEventDetails = async () => {
       try {
-        const [eventResponse, registrationResponse] = await Promise.all([
-          axios.get(`http://localhost:5000/api/events/${id}`),
-          user
-            ? axios.get(`http://localhost:5000/api/registrations/check/${id}`, {
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem('token')}`,
-                },
-              })
-            : { data: { isRegistered: false } },
-        ]);
-
-        setEvent(eventResponse.data);
-        setIsRegistered(registrationResponse.data.isRegistered);
+        const response = await axios.get(`http://localhost:5000/api/events/${id}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (response.data) {
+          setEvent(response.data);
+          setError('');
+          
+          if (user) {
+            try {
+              const registrationResponse = await axios.get(
+                `http://localhost:5000/api/registrations/check/${id}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`
+                  }
+                }
+              );
+              setIsRegistered(registrationResponse.data.isRegistered);
+            } catch (regErr) {
+              console.error('Error checking registration:', regErr);
+              setIsRegistered(false);
+            }
+          }
+        } else {
+          setError('Invalid event data received');
+        }
       } catch (err) {
-        setError('Failed to fetch event details');
-        console.error('Error:', err);
+        console.error('Error fetching event:', err);
+        if (err.response?.status === 404) {
+          setError('Event not found');
+        } else if (err.response?.status === 401) {
+          setError('Please login to view event details');
+        } else {
+          setError('Failed to fetch event details. Please try again later.');
+        }
       } finally {
         setLoading(false);
       }
@@ -57,23 +79,55 @@ const EventDetails = () => {
     }
 
     try {
-      await axios.post(
-        `http://localhost:5000/api/registrations/${id}`,
-        {},
+      setLoading(true);
+      setError('');
+
+      const response = await axios.post(
+        'http://localhost:5000/api/registrations',
+        { event_id: parseInt(id) },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+        }
+      );
+
+      // Update local state
+      setIsRegistered(true);
+      setEvent((prev) => ({
+        ...prev,
+        current_registrations: prev.current_registrations + 1,
+      }));
+
+      // Show success message
+      setError('Successfully registered for the event!');
+      setTimeout(() => setError(''), 3000); // Clear success message after 3 seconds
+
+      // Refresh registration status
+      const checkResponse = await axios.get(
+        `http://localhost:5000/api/registrations/check/${id}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
         }
       );
-      setIsRegistered(true);
-      setEvent((prev) => ({
-        ...prev,
-        current_registrations: prev.current_registrations + 1,
-      }));
+      setIsRegistered(checkResponse.data.registered);
     } catch (err) {
-      setError('Failed to register for the event');
-      console.error('Error:', err);
+      console.error('Registration error:', err);
+      if (err.response?.status === 400) {
+        setError(err.response.data.message || 'Failed to register for the event');
+      } else if (err.response?.status === 401) {
+        setError('Please login to register for the event');
+        navigate('/login');
+      } else if (err.response?.status === 404) {
+        setError('Event not found');
+      } else {
+        setError('Failed to register for the event. Please try again later.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -145,15 +199,20 @@ const EventDetails = () => {
                   fullWidth
                   onClick={handleRegistration}
                   disabled={
+                    loading ||
                     isRegistered ||
                     event.current_registrations >= event.capacity
                   }
                 >
-                  {isRegistered
-                    ? 'Already Registered'
-                    : event.current_registrations >= event.capacity
-                    ? 'Event Full'
-                    : 'Register Now'}
+                  {loading ? (
+                    <CircularProgress size={24} color="inherit" />
+                  ) : isRegistered ? (
+                    'Already Registered'
+                  ) : event.current_registrations >= event.capacity ? (
+                    'Event Full'
+                  ) : (
+                    'Register Now'
+                  )}
                 </Button>
               ) : (
                 <Button

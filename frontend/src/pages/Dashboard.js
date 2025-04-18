@@ -27,11 +27,29 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchUpcomingEvents = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/events/upcoming');
-        setUpcomingEvents(response.data?response.data:[]);
+        const response = await axios.get('http://localhost:5000/api/events', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        if (response.data && Array.isArray(response.data)) {
+          const events = response.data
+            .filter(event => new Date(event.date_time) > new Date())
+            .sort((a, b) => new Date(a.date_time) - new Date(b.date_time))
+            .slice(0, 5);
+          setUpcomingEvents(events);
+          setError('');
+        } else {
+          setError('Invalid response format from server');
+        }
       } catch (err) {
-        setError('No Upcoming Events');
-        console.error('Error:', err);
+        console.error('Error fetching events:', err);
+        if (err.response?.status === 401) {
+          setError('Please login again');
+        } else {
+          setError('Failed to fetch upcoming events. Please try again later.');
+        }
       } finally {
         setLoading(false);
       }

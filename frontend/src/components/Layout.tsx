@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Box,
@@ -12,7 +12,8 @@ import {
   ListItemText,
   Toolbar,
   Typography,
-  Button,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -30,6 +31,12 @@ const Layout: React.FC = () => {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  // Don't show AppBar on login and register pages
+  const showAppBar = !['/login', '/register'].includes(location.pathname);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -59,10 +66,16 @@ const Layout: React.FC = () => {
             key={item.text}
             onClick={() => {
               navigate(item.path);
-              setMobileOpen(false);
+              if (isMobile) setMobileOpen(false);
+            }}
+            sx={{
+              '&:hover': {
+                backgroundColor: theme.palette.primary.light,
+                color: theme.palette.primary.contrastText,
+              },
             }}
           >
-            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemIcon sx={{ color: 'inherit' }}>{item.icon}</ListItemIcon>
             <ListItemText primary={item.text} />
           </ListItem>
         ))}
@@ -72,8 +85,14 @@ const Layout: React.FC = () => {
             logout();
             navigate('/login');
           }}
+          sx={{
+            '&:hover': {
+              backgroundColor: theme.palette.error.light,
+              color: theme.palette.error.contrastText,
+            },
+          }}
         >
-          <ListItemIcon>
+          <ListItemIcon sx={{ color: 'inherit' }}>
             <LogoutIcon />
           </ListItemIcon>
           <ListItemText primary="Logout" />
@@ -85,28 +104,30 @@ const Layout: React.FC = () => {
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: drawerWidth },
-        }}
-      >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            College Event Management
-          </Typography>
-        </Toolbar>
-      </AppBar>
+      {showAppBar && (
+        <AppBar
+          position="fixed"
+          sx={{
+            width: { sm: `calc(100% - ${drawerWidth}px)` },
+            ml: { sm: drawerWidth },
+          }}
+        >
+          <Toolbar>
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 2, display: { sm: 'none' } }}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+              EventHub
+            </Typography>
+          </Toolbar>
+        </AppBar>
+      )}
       <Box
         component="nav"
         sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
@@ -121,6 +142,7 @@ const Layout: React.FC = () => {
           sx={{
             display: { xs: 'block', sm: 'none' },
             '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: drawerWidth,
             },
           }}
@@ -132,6 +154,7 @@ const Layout: React.FC = () => {
           sx={{
             display: { xs: 'none', sm: 'block' },
             '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: drawerWidth,
             },
           }}
@@ -144,11 +167,13 @@ const Layout: React.FC = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: 0,
           width: { sm: `calc(100% - ${drawerWidth}px)` },
+          mt: { xs: showAppBar ? 7 : 0, sm: 0 },
+          maxWidth: '100% !important'
         }}
       >
-        <Toolbar />
+        {showAppBar && <Toolbar />}
         <Outlet />
       </Box>
     </Box>

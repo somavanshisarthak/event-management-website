@@ -3,7 +3,6 @@ const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger.json');
 const { initializeDatabase } = require('./config/database');
-const registrationsRouter = require('./routes/registrations');
 require('dotenv').config();
 
 const app = express();
@@ -32,8 +31,6 @@ const startServer = async () => {
     console.log('Users route loaded');
     app.use('/api/notifications', require('./routes/notifications.js'));
     console.log('Notifications route loaded');
-    app.use('/api/registrations', registrationsRouter);
-    console.log('Registrations route loaded');
 
     // Error handling middleware
     app.use((err, req, res, next) => {
