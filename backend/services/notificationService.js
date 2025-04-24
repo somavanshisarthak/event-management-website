@@ -28,11 +28,13 @@ const sendEmailNotification = async (to, subject, text) => {
 };
 
 // Create in-app notification
-const createInAppNotification = async (user_id, title, message) => {
+const createInAppNotification = async (user_id, event_id, title, message) => {
   try {
     await db.query(
-      'INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)',
-      [user_id, title, message]
+      `INSERT INTO notifications
+        (user_id, event_id, title, message)
+       VALUES (?, ?, ?, ?)`,
+      [user_id, event_id, title, message]
     );
     return true;
   } catch (error) {
@@ -44,39 +46,56 @@ const createInAppNotification = async (user_id, title, message) => {
 // Check and send event reminders
 const checkAndSendEventReminders = async () => {
   try {
-    // Get events starting in 12 hours
-    const [events] = await db.query(`
-      SELECT e.*, u.email as student_email, u.id as student_id
+    const [rows] = await db.query(`
+      SELECT
+        e.id           AS event_id,
+        e.title        AS event_title,
+        e.date_time    AS event_date_time,
+        r.user_id      AS student_id,
+        u.email        AS student_email
       FROM events e
       JOIN registrations r ON e.id = r.event_id
-      JOIN users u ON r.student_id = u.id
-      WHERE e.date_time BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 12 HOUR)
-      AND NOT EXISTS (
-        SELECT 1 FROM notifications n 
-        WHERE n.user_id = u.id
-        AND n.message LIKE '%reminder%'
-      )
+      JOIN users u         ON u.id = r.user_id
+      WHERE 
+        e.date_time BETWEEN
+          -- 12 hours minus 5 minutes
+          DATE_SUB(
+            DATE_ADD(NOW(), INTERVAL 12 HOUR),
+            INTERVAL 5 MINUTE
+          )
+        AND
+          -- 12 hours plus 5 minutes
+          DATE_ADD(
+            DATE_ADD(NOW(), INTERVAL 12 HOUR),
+            INTERVAL 5 MINUTE
+          )
+        AND NOT EXISTS (
+          -- only skip if *this* event reminder already exists
+          SELECT 1
+          FROM notifications n
+          WHERE n.user_id  = r.user_id
+            AND n.event_id = e.id
+            AND n.title    = 'Event Reminder'
+        )
     `);
 
-    for (const event of events) {
-      const message = `Reminder: Event "${event.title}" is starting in 12 hours!`;
-      
-      // Send email notification
-      await sendEmailNotification(
-        event.student_email,
-        'Event Reminder',
-        message
-      );
+    for (const event of rows) {
+      const when = new Date(event.event_date_time).toLocaleString();
+      const message = `Are you ready for "${event.event_title}" on ${when}?`;
 
-      // Create in-app notification
+      // email
+      await sendEmailNotification(event.student_email, 'Event Reminder', message);
+
+      // in-app
       await createInAppNotification(
-        event.student_id,
-        'Event Reminder',
+        event.student_id,   // user_id
+        event.event_id,     // event_id
+        'Event Reminder',   // title
         message
       );
     }
   } catch (error) {
-    console.error('Error in checkAndSendEventReminders:', error);
+    console.error('Error checking and sending reminders:', error);
   }
 };
 

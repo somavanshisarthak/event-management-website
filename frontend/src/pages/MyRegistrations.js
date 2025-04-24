@@ -24,8 +24,9 @@ const MyRegistrations = () => {
   useEffect(() => {
     const fetchRegistrations = async () => {
       try {
+        setLoading(true);
         const response = await axios.get(
-          'http://localhost:5000/api/registrations/my',
+          'http://localhost:5000/api/registrations/student',
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -33,16 +34,22 @@ const MyRegistrations = () => {
           }
         );
         setRegistrations(response.data);
+        setError('');
       } catch (err) {
-        setError('Failed to fetch registrations');
-        console.error('Error:', err);
+        console.error('Error fetching registrations:', err);
+        if (err.response?.status === 401) {
+          setError('Please login to view your registrations');
+          navigate('/login');
+        } else {
+          setError('Failed to fetch your registrations. Please try again later.');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchRegistrations();
-  }, []);
+  }, [navigate]);
 
   const handleCancelRegistration = async (eventId) => {
     try {

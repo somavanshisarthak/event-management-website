@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { auth, checkRole } = require('../middleware/auth');
+const { sendEmailNotification, createInAppNotification } = require('../services/notificationService');
 
 // Register for an event (Student only)
 router.post('/', auth, checkRole(['student']), async (req, res) => {
@@ -22,7 +23,7 @@ router.post('/', auth, checkRole(['student']), async (req, res) => {
 
     // Check if event exists and has capacity
     const [events] = await connection.query(
-      `SELECT e.*, u.name as organizer_name 
+      `SELECT e.*, u.name as organizer_name, u.email as student_email 
        FROM events e 
        JOIN users u ON e.organizer_id = u.id 
        WHERE e.id = ?`,
@@ -80,6 +81,31 @@ router.post('/', auth, checkRole(['student']), async (req, res) => {
        WHERE id = ?`,
       [event_id]
     );
+
+    // Check if we should send an immediate reminder
+    const eventTime = new Date(event.date_time);
+    const now = new Date();
+    const diffHours = (eventTime - now) / (1000 * 60 * 60);
+
+    if (diffHours <= 12) {
+      const when = eventTime.toLocaleString();
+      const message = `Are you ready for "${event.title}" on ${when}?`;
+
+      // Send immediate email notification
+      await sendEmailNotification(
+        event.student_email,
+        'Event Reminder',
+        message
+      );
+
+      // Create immediate in-app notification
+      await createInAppNotification(
+        user_id,
+        event_id,
+        'Event Reminder',
+        message
+      );
+    }
 
     await connection.commit();
 
@@ -142,8 +168,14 @@ router.get('/event/:event_id', auth, checkRole(['organizer', 'admin']), async (r
 router.get('/student', auth, checkRole(['student']), async (req, res) => {
   try {
     const [registrations] = await db.query(`
-      SELECT r.*, e.title as event_title, e.description as event_description, 
-             e.date_time as event_date_time, u.name as organizer_name
+      SELECT 
+        r.*,
+        e.title              AS event_title,
+        e.description        AS event_description,
+        e.date_time          AS event_date,        -- match frontend
+        e.location           AS event_location,    -- match frontend
+        e.category           AS event_category,    -- match frontend
+        u.name               AS organizer_name
       FROM registrations r
       JOIN events e ON r.event_id = e.id
       JOIN users u ON e.organizer_id = u.id
@@ -152,6 +184,7 @@ router.get('/student', auth, checkRole(['student']), async (req, res) => {
 
     res.json(registrations);
   } catch (err) {
+    console.error('Error fetching registrations:', err);
     res.status(500).json({ message: 'Error fetching registrations' });
   }
 });
@@ -221,6 +254,30 @@ router.get('/check/:eventId', auth, async (req, res) => {
   } catch (err) {
     console.error('Error checking registration:', err);
     res.status(500).json({ message: 'Error checking registration status' });
+  }
+});
+
+// Alias for /student endpoint
+router.get('/my', auth, checkRole(['student']), async (req, res) => {
+  try {
+    const [registrations] = await db.query(`
+      SELECT 
+        r.*,
+        e.title              AS event_title,
+        e.description        AS event_description,
+        e.date_time          AS event_date,        -- match frontend
+        e.location           AS event_location,    -- match frontend
+        e.category           AS event_category,    -- match frontend
+        u.name               AS organizer_name
+      FROM registrations r
+      JOIN events e ON r.event_id = e.id
+      JOIN users u ON e.organizer_id = u.id
+      WHERE r.user_id = ?
+    `, [req.user.id]);
+    res.json(registrations);
+  } catch (err) {
+    console.error('Error fetching registrations:', err);
+    res.status(500).json({ message: 'Error fetching registrations' });
   }
 });
 

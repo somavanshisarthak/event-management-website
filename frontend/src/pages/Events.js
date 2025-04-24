@@ -57,7 +57,7 @@ const Events = () => {
   return (
     <Container>
       <Typography variant="h4" component="h1" gutterBottom>
-        Eventsss
+        Events
       </Typography>
       <Grid container spacing={3}>
         {events.map((event) => (

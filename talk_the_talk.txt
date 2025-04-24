@@ -1,0 +1,8 @@
+
+destructuring in javascript
+
+salt & hash to hide passwords
+
+JWT token creates a token that client and server has frontend send to backend a token and verify sign or registration
+stateful - backend store and send different token sent to frontend
+stateless - stateless directly shows  
