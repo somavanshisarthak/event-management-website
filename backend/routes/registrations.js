@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { auth, checkRole } = require('../middleware/auth');
 const { sendEmailNotification, createInAppNotification } = require('../services/notificationService');
+const { sendRegistrationEmail, sendRegistrationNotification } = require('../services/emailService');
 
 // Register for an event (Student only)
 router.post('/', auth, checkRole(['student']), async (req, res) => {
@@ -23,11 +24,16 @@ router.post('/', auth, checkRole(['student']), async (req, res) => {
 
     // Check if event exists and has capacity
     const [events] = await connection.query(
-      `SELECT e.*, u.name as organizer_name, u.email as student_email 
+      `SELECT e.*, 
+              u.name as organizer_name, 
+              u.email as organizer_email,
+              s.email as student_email,
+              s.name as student_name
        FROM events e 
        JOIN users u ON e.organizer_id = u.id 
+       JOIN users s ON s.id = ?
        WHERE e.id = ?`,
-      [event_id]
+      [user_id, event_id]
     );
 
     if (events.length === 0) {
@@ -80,6 +86,24 @@ router.post('/', auth, checkRole(['student']), async (req, res) => {
        SET current_registrations = current_registrations + 1 
        WHERE id = ?`,
       [event_id]
+    );
+
+    // Send registration confirmation email to student
+    await sendRegistrationEmail(event.student_email, {
+      title: event.title,
+      date_time: event.date_time,
+      location: event.location
+    });
+
+    // Send notification email to organizer
+    await sendRegistrationNotification(
+      event.organizer_email,
+      {
+        title: event.title,
+        date_time: event.date_time,
+        location: event.location
+      },
+      event.student_name
     );
 
     // Check if we should send an immediate reminder
