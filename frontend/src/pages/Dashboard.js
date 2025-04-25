@@ -94,7 +94,7 @@ const Dashboard = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={8}>
+        <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>
               Upcoming Events
@@ -162,29 +162,6 @@ const Dashboard = () => {
             >
               View All Events
             </Button>
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>
-              Quick Actions
-            </Typography>
-            <List>
-              {user.role === 'student' && (
-                <ListItem button onClick={() => navigate('/my-registrations')}>
-                  <ListItemText primary="View My Registrations" />
-                </ListItem>
-              )}
-              {(user.role === 'organizer' || user.role === 'admin') && (
-                <ListItem button onClick={() => navigate('/create-event')}>
-                  <ListItemText primary="Create New Event" />
-                </ListItem>
-              )}
-              <ListItem button onClick={() => navigate('/notifications')}>
-                <ListItemText primary="View Notifications" />
-              </ListItem>
-            </List>
           </Paper>
         </Grid>
       </Grid>

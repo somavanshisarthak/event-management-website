@@ -215,22 +215,52 @@ router.get('/student', auth, checkRole(['student']), async (req, res) => {
 
 // Cancel registration (Student only)
 router.delete('/:event_id', auth, checkRole(['student']), async (req, res) => {
+  let connection;
   try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
     const event_id = req.params.event_id;
     const user_id = req.user.id;
 
-    const [result] = await db.query(
+    // Check if registration exists
+    const [existingReg] = await connection.query(
+      'SELECT * FROM registrations WHERE event_id = ? AND user_id = ?',
+      [event_id, user_id]
+    );
+
+    if (existingReg.length === 0) {
+      throw { status: 404, message: 'Registration not found' };
+    }
+
+    // Delete registration
+    await connection.query(
       'DELETE FROM registrations WHERE event_id = ? AND user_id = ?',
       [event_id, user_id]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Registration not found' });
-    }
+    // Decrease current_registrations count
+    await connection.query(
+      `UPDATE events 
+       SET current_registrations = GREATEST(current_registrations - 1, 0)
+       WHERE id = ?`,
+      [event_id]
+    );
 
+    await connection.commit();
     res.json({ message: 'Registration cancelled successfully' });
   } catch (err) {
-    res.status(500).json({ message: 'Error cancelling registration' });
+    if (connection) {
+      await connection.rollback();
+    }
+    console.error('Error cancelling registration:', err);
+    const status = err.status || 500;
+    const message = err.message || 'Error cancelling registration';
+    res.status(status).json({ message });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 
